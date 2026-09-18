@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -e
-ROOT=/home/meissa/zt-simulator
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 VENV=$ROOT/venv/bin/python
 LOG_DIR=$ROOT/metrics/run_pqc/logs
 

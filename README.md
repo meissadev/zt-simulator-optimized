@@ -357,6 +357,77 @@ Note : le **code** des benchmarks (`metrics/*.py`, `metrics/run_*/start_services
 est versionne ; seuls les **resultats** (`metrics/**/*.json`, `*.txt`, `logs/`)
 sont exclus par `.gitignore`.
 
+## Scenario CONNECTION_REUSE / KEEP_ALIVE (optimisation etape 1)
+
+**Probleme mesure** : Werkzeug (`run_simple`, backend historique) impose
+`Connection: close` sur chaque reponse : UNE requete HTTPS par connexion TLS.
+En PQC, chaque nouvelle requete rejoue donc l'handshake TLS avec le KEM HQC-1
+(plusieurs centaines de ms) -- par iteration, et non une seule fois.
+
+**Backend keep-alive** (`common/keepalive_server.py`) : serveur HTTPS -> WSGI
+stdlib (threaded) qui BOUCLE plusieurs requetes sur la meme connexion TLS.
+Il sert exactement les memes applications Flask, les memes certificats et
+les memes `SSLContext` (construits par les services, non modifies) ; aucun
+composant du simulateur n'est change. Selection par variable d'environnement :
+
+```
+ZT_WSGI_BACKEND=keepalive   # backend keep-alive (scenario CONNECTION_REUSE)
+ZT_WSGI_BACKEND=            # defaut : Werkzeug, comportement historique
+ZT_DEBUG_CONNS=1            # logs : chaque NOUVELLE CONNEXION TLS et chaque requete
+```
+
+**Methode** (definition des metriques INCHANGEE, `time.perf_counter()`, N=50) :
+1. etablissement de la connexion (1re requete sur connexion neuve, handshake
+   HQC-1 inclus) mesure SEPAREMENT (`establishment_ms`) ;
+2. N echantiillons chronometres UNIQUEMENT sur la connexion deja etablie
+   (aucun handshake rejoue) ;
+3. attestation de la reutilisation reelle de la connexion via les compteurs
+   urllib3 du pool (`num_connections` / `num_requests`) et les logs serveur
+   (`ZT_DEBUG_CONNS=1`) -- chaque JSON de resultat porte `reuse_verified`.
+
+**Lancement** (phase PQC, backend keep-alive) :
+
+```bash
+bash metrics/run_pqc/start_services_keepalive.sh   # OPA + Ressource + IdP + PEP
+# verification du groupe HQC-1 sur les services vivants :
+echo | openssl s_client -connect 127.0.0.1:8444 -servername idp.ztpqc.lab \
+       -CAfile pki-pqc/ca/certs/ca.cert.pem 2>/dev/null | grep "Negotiated TLS"
+```
+
+**Benchmarks du scenario** (`*_keepalive.py`, N=50, sortie JSON) :
+
+```bash
+CA=pki-pqc/ca/certs/ca.cert.pem
+venv/bin/python metrics/bench_auth_keepalive.py            --n 50 --ca-cert $CA --expected-alg cross-rsdp-128-balanced
+venv/bin/python metrics/bench_access_keepalive.py          --n 50 --ca-cert $CA
+venv/bin/python metrics/bench_throughput_keepalive.py      --n 50 --ca-cert $CA --expected-alg cross-rsdp-128-balanced
+venv/bin/python metrics/bench_s2s_auth_keepalive.py        --mode pqc --n 50 --ca-cert $CA
+venv/bin/python metrics/bench_s2s_latency_keepalive.py     --mode pqc --n 50 --ca-cert $CA
+venv/bin/python metrics/bench_s2s_throughput_keepalive.py  --mode pqc --n 50 --ca-cert $CA
+```
+
+**Resultats PQC (N=50, meme machine)** : base de comparaison = scripts de
+reference sur backend Werkzeug, mesures sur cette machine (reproduits sur
+cette meme machine dans `metrics/run_pqc/baseline_on_werkzeug/`) :
+
+| Metrique (connexion tiede)                     | Werkzeug (ref.) | KEEP_ALIVE     | Gain  |
+|------------------------------------------------|-----------------|----------------|-------|
+| Auth User -> Service (moyenne)                 | 334.034 ms      | 107.558 ms     | x3.1  |
+| Latence d'acces bout-en-bout (moyenne)         | 368.096 ms      | 71.963 ms      | x5.1  |
+| Debit auth / acces                             | 2.874 / 2.873   | 9.052 / 13.654 | x3.2 / x4.8 |
+| Latence d'acces Service -> Service (moyenne)   | 365.820 ms      | 62.685 ms      | x5.8  |
+| Debit Service -> Service                       | 2.814 req/s     | 15.970 req/s   | x5.7  |
+| Handshakes mTLS S2S (pour 50 requetes)         | 50              | 1              | --    |
+
+Etablissement (1 seule fois, non amorti dans les echantiillons) :
+auth 240.426 ms, acces 361.757 ms, S2S latence 222.845 ms. Rapport complet et
+jeux de donnees bruts : `metrics/run_pqc/keepalive/` (`results.txt`,
+`results.json`, `*_keepalive.json`, `logs/keepalive/`).
+
+**Perimetre** : cette etape ne touche QUE le transport TLS. Cache JWKS
+persistant, connexion PDP persistante et autres optimisations du plan sont
+volontairement HORS perimetre (etapes suivantes, a valider explicitement).
+
 ## Ports
 
 | Service    | Port | Protocole        |
@@ -399,7 +470,10 @@ zt-simulator/
     opa_config.yaml
   ressource/
     app.py, openssl_pqc.cnf, requirements.txt
+  common/
+    keepalive_server.py       # backend HTTPS->WSGI keep-alive (CONNECTION_REUSE)
   metrics/                    # code versionne ; resultats ignores (.gitignore)
+    _keepalive_lib.py         # session persistante + comptage connexions urllib3
     bench_sizes.py            # tailles crypto User -> Service
     bench_auth.py             # temps d'authentification
     bench_access.py           # latence d'acces bout-en-bout
@@ -408,8 +482,18 @@ zt-simulator/
     bench_s2s_auth.py         # temps d'authentification S2S (mTLS)
     bench_s2s_latency.py      # latence d'acces S2S
     bench_s2s_throughput.py   # debit Service -> Service
+    bench_auth_keepalive.py   # scenario CONNECTION_REUSE (connexion persistante)
+    bench_access_keepalive.py
+    bench_throughput_keepalive.py
+    bench_s2s_auth_keepalive.py
+    bench_s2s_latency_keepalive.py
+    bench_s2s_throughput_keepalive.py
     run_classical/            # resultats + start_services.sh (RSA-3072)
     run_pqc/                  # resultats + start_services.sh (CROSS/HQC-1)
+      start_services_keepalive.sh   # OPA + services (backend keep-alive)
+      keepalive/                    # resultats du scenario CONNECTION_REUSE
+      baseline_on_werkzeug/         # controle : scripts de ref. sur Werkzeug
+      baseline_on_keepalive_server/ # controle : scripts de ref. sur backend KA
   README.md
 ```
 

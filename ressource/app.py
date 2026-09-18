@@ -10,6 +10,7 @@ en profondeur -- seul le PEP doit posséder un tel certificat.
 
 import os
 import ssl
+import sys
 import logging
 
 from flask import Flask, jsonify, request
@@ -118,11 +119,19 @@ if __name__ == "__main__":
     ssl_context = build_ssl_context()
 
     logger.info("Démarrage du service Ressource sur https://%s:%s (mTLS requis)", HOST, PORT)
-    run_simple(
-        HOST,
-        PORT,
-        app,
-        ssl_context=ssl_context,
-        request_handler=PeerCertRequestHandler,
-        threaded=True,
-    )
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from common import keepalive_server
+    if keepalive_server.use_keepalive_backend():
+        keepalive_server.serve(
+            app, HOST, PORT, ssl_context,
+            conn_log=os.environ.get("ZT_DEBUG_CONNS") == "1",
+        )
+    else:
+        run_simple(
+            HOST,
+            PORT,
+            app,
+            ssl_context=ssl_context,
+            request_handler=PeerCertRequestHandler,
+            threaded=True,
+        )

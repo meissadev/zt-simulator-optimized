@@ -22,6 +22,7 @@ utilisateur -- à documenter comme simplification assumée en 4.8.
 import logging
 import os
 import ssl
+import sys
 import time
 
 from flask import Flask, jsonify, request
@@ -161,4 +162,12 @@ if __name__ == "__main__":
         "Démarrage de l'IdP sur https://%s:%s (issuer=%s, mode=%s, alg=%s)",
         config.HOST, config.PORT, config.ISSUER, config.CRYPTO_MODE, signer.alg,
     )
-    run_simple(config.HOST, config.PORT, app, ssl_context=ssl_context, threaded=True)
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from common import keepalive_server
+    if keepalive_server.use_keepalive_backend():
+        keepalive_server.serve(
+            app, config.HOST, config.PORT, ssl_context,
+            conn_log=os.environ.get("ZT_DEBUG_CONNS") == "1",
+        )
+    else:
+        run_simple(config.HOST, config.PORT, app, ssl_context=ssl_context, threaded=True)

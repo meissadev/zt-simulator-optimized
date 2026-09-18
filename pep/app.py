@@ -15,6 +15,7 @@ Trois étapes strictement séquentielles et jamais court-circuitées :
 
 import logging
 import os
+import sys
 
 import requests
 from flask import Flask, Response, jsonify, request
@@ -180,11 +181,19 @@ if __name__ == "__main__":
     ssl_context = mtls_handler.build_server_ssl_context()
 
     logger.info("Démarrage du PEP sur https://%s:%s", config.HOST, config.PORT)
-    run_simple(
-        config.HOST,
-        config.PORT,
-        app,
-        ssl_context=ssl_context,
-        request_handler=PeerCertRequestHandler,
-        threaded=True,
-    )
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from common import keepalive_server
+    if keepalive_server.use_keepalive_backend():
+        keepalive_server.serve(
+            app, config.HOST, config.PORT, ssl_context,
+            conn_log=os.environ.get("ZT_DEBUG_CONNS") == "1",
+        )
+    else:
+        run_simple(
+            config.HOST,
+            config.PORT,
+            app,
+            ssl_context=ssl_context,
+            request_handler=PeerCertRequestHandler,
+            threaded=True,
+        )
