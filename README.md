@@ -428,6 +428,75 @@ jeux de donnees bruts : `metrics/run_pqc/keepalive/` (`results.txt`,
 persistant, connexion PDP persistante et autres optimisations du plan sont
 volontairement HORS perimetre (etapes suivantes, a valider explicitement).
 
+## Dockerisation et micro-segmentation
+
+Conteneurisation de **l'architecture existante** sans en modifier la
+cryptographie, la PKI, les certificats, le domaine ni le DNS :
+
+* cryptographie conservee : OpenSSL 3.5.8 + oqs-provider + liboqs, KEM
+  **HQC-1**, signature **cross-rsdp-128-balanced**, backend HTTPS
+  **keep-alive** (ZT_WSGI_BACKEND=keepalive) ;
+* PKI conservee : `pki-pqc` (certificats `idp/pep/ressource.ztpqc.lab`,
+  SAN inchanges) montee en lecture seule dans les conteneurs ;
+* domaine conserve : les FQDN `*.ztpqc.lab` sont utilises tels quels pour
+  toutes les communications TLS (aucun aliasing vers des noms Docker) ;
+* Bind9 conserve inchange : autorite du domaine `ztpqc.lab` pour le LAN ;
+  cote Docker, la resolution des FQDN dans les reseaux est assuree par le
+  DNS integre de Docker via des **alias par reseau** (combinaison des deux,
+  sans remplacer Bind9).
+
+**Base image `pqc`** : l'image deja construite (OpenSSL 3.5.8, oqs-provider,
+liboqs, HQC-1) sert de base sans etre reconstruite. `docker/Dockerfile` n'y
+ajoute que les dependances Python (meme version que l'hote), la section
+`ssl_conf`/`Groups = hqc1` du openssl.cnf (miroir du contexte hote,
+indispensable au module ssl de Python), le code des services et le binaire
+opa 1.20.2. Image resultante : `ztpqc-services`.
+
+**Reseaux et micro-segmentation** (`docker-compose.yml`) : trois reseaux
+bridge isoles, l'appartenance aux reseaux limite les chemins de
+communication ; la connectivite effective ne depend PAS de la resolution des
+noms (le DNS reste autoritaire, seul le reseau partage autorise le flux) :
+
+```
+                 [hote : 127.0.0.1:8443/8444/8446/8181, ports publies]
+                                        |
+                 +----------------------+-----------------------+
+                 |                                              |
+  net_idp   PEP <-> IdP (JWKS/token)    net_s2s  PEP <-> Ressource (mTLS S2S)
+  net_pdp   PEP <-> PDP/OPA (decision)
+```
+
+Alias DNS (reseau d'acces) : `idp.ztpqc.lab` sur net_idp,
+`ressource.ztpqc.lab` sur net_s2s. IdP n'est sur aucun reseau avec PDP ou
+Ressource ; PDP et Ressource n'ont que PEP. L'hote n'expose que les ports
+publies sur `127.0.0.1` (aucun listen `0.0.0.0` cote hote).
+
+**Lancement / arret** :
+
+```bash
+docker compose up -d --build      # construit ztpqc-services puis demarre
+docker compose ps                 # 4 services healthy (healthcheck TLS)
+bash docker/validate_flows.sh     # validation des flux (autorises + refuses)
+docker compose down               # rend la main aux scripts hote
+bash metrics/run_pqc/start_services_keepalive.sh   # mode hote (hors Docker)
+```
+
+**Validation des flux** (`docker/validate_flows.sh`) : 10 verifications, dont
+les flux autorises (PEP -> IdP JWKS avec verification CA, PEP -> PDP OPA,
+PEP -> Ressource mTLS avec SAN conserve, groupe TLS hqc1 negocie au sein du
+reseau) et les flux refuses (IdP -> PDP, IdP -> Ressource, PDP -> IdP,
+PDP -> Ressource, Ressource -> IdP, et exposition hote limitee a la boucle
+locale). Compte-rendu recent : `metrics/run_pqc/docker/validation.txt`.
+Benchmarks de bout en bout (hote -> ports publies, N=3, backend keep-alive) :
+auth ~70-90 ms, acces ~84 ms, S2S ~59 ms (connexions tiedes, 1 connexion par
+chemin) -- coherent avec les mesures du mode hote.
+
+**Limite** : la micro-segmentation porte sur les chemins entre conteneurs et
+sur l'exposition hote ; depuis l'hote lui-meme, les IP des conteneurs sur le
+sous-reseau bridge restent joignables (l'hote est l'infrastructure de
+confiance). Un controle supplementaire au niveau hote (firewall) est possible
+en renfort si l'hote est multi-tenant.
+
 ## Ports
 
 | Service    | Port | Protocole        |
@@ -494,6 +563,12 @@ zt-simulator/
       keepalive/                    # resultats du scenario CONNECTION_REUSE
       baseline_on_werkzeug/         # controle : scripts de ref. sur Werkzeug
       baseline_on_keepalive_server/ # controle : scripts de ref. sur backend KA
+      docker/                       # validation des flux (dockerise)
+  docker/                     # dockerisation + micro-segmentation
+    Dockerfile                # FROM pqc ; deps Python ; ssl_conf hqc1 ; code
+    validate_flows.sh         # validation des flux autorises/refuses
+    .dockerignore
+  docker-compose.yml          # 3 reseaux isoles (net_idp/net_pdp/net_s2s)
   README.md
 ```
 

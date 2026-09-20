@@ -1,0 +1,139 @@
+# Dockerisation de l'architecture PQC (simulateur Zero Trust) avec
+# micro-segmentation des flux reseau.
+#
+# Principes (cf. README "Dockerisation") :
+#   * l'image de base `pqc` (OpenSSL 3.5.8 + oqs-provider + liboqs + HQC-1)
+#     est conservee telle quelle ; l'image ztpqc-services n'y ajoute que les
+#     deps Python, la config TLS hqc1 et le code des services ;
+#   * le domaine ztpqc.lab et les certificats existants (pki-pqc) sont
+#     conserves : aucune PKI, aucun panneau DNS, aucun nom d'hote modifie ;
+#   * la resolution des FQDN *.ztpqc.lab dans les reseaux Docker est assuree
+#     par le DNS integre de Docker via des ALIAS par reseau (ex. un alias
+#     idp.ztpqc.lab n'existe que sur le reseau idp<->pep). Bind9 reste
+#     inchange et autorite du domaine pour le LAN/l'hote ;
+#   * la micro-segmentation est reproducible par l'appartenance aux reseaux :
+#        net_idp : PEP <-> IdP        (JWKS / token)
+#        net_pdp : PEP <-> PDP (OPA)  (decision d'autorisation)
+#        net_s2s : PEP <-> Ressource  (mTLS service-a-service)
+#     IdP ne voit ni PDP ni Ressource ; PDP et Ressource ne voient que PEP.
+#   * le backend HTTPS keep-alive (ZT_WSGI_BACKEND=keepalive) est conserve ;
+#   * les ports sont publies UNIQUEMENT sur 127.0.0.1 (hote) pour reproduire
+#     les flux User -> Service des benchmarks (https://*.ztpqc.lab:8443-8446) ;
+#   * la PKI (cles privees incluses) est montee en lecture seule.
+
+name: zt-pqc
+
+x-zt-service: &zt
+  image: ztpqc-services:latest
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+  restart: unless-stopped
+
+services:
+  # ---------------------------------------------------------------- IdP ----
+  idp:
+    <<: *zt
+    container_name: zt-idp
+    working_dir: /app/idp
+    command: ["python3", "app.py"]
+    environment:
+      CRYPTO_MODE: pqc
+      PQC_SIG_ALG: cross-rsdp-128-balanced
+      PKI_DIR: /pki-pqc
+      ZT_WSGI_BACKEND: keepalive
+      ZT_DEBUG_CONNS: "1"
+    volumes:
+      - ./pki-pqc:/pki-pqc:ro
+    ports:
+      - "127.0.0.1:8444:8444"
+    networks:
+      net_idp:
+        aliases: ["idp.ztpqc.lab"]
+    healthcheck:
+      test: ["CMD", "python3", "-c",
+             "import urllib.request as u, ssl; u.urlopen('https://127.0.0.1:8444/health', context=ssl._create_unverified_context(), timeout=5)"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # ---------------------------------------------------------------- PEP ----
+  pep:
+    <<: *zt
+    container_name: zt-pep
+    working_dir: /app/pep
+    command: ["python3", "app.py"]
+    environment:
+      CRYPTO_MODE: pqc
+      PQC_SIG_ALG: cross-rsdp-128-balanced
+      EXPECTED_JWT_ALG: cross-rsdp-128-balanced
+      PKI_DIR: /pki-pqc
+      IDP_JWKS_URL: https://idp.ztpqc.lab:8444/jwks
+      RESOURCE_BASE_URL: https://ressource.ztpqc.lab:8446
+      OPA_URL: http://pdp:8181/v1/data/authz/allow
+      ZT_WSGI_BACKEND: keepalive
+      ZT_DEBUG_CONNS: "1"
+    volumes:
+      - ./pki-pqc:/pki-pqc:ro
+    ports:
+      - "127.0.0.1:8443:8443"
+    networks:
+      net_idp: {}
+      net_pdp: {}
+      net_s2s: {}
+    healthcheck:
+      test: ["CMD", "python3", "-c",
+             "import urllib.request as u, ssl; u.urlopen('https://127.0.0.1:8443/health', context=ssl._create_unverified_context(), timeout=5)"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    depends_on:
+      idp:
+        condition: service_healthy
+      pdp:
+        condition: service_healthy
+
+  # ------------------------------------------------------- PDP (OPA) ------
+  pdp:
+    <<: *zt
+    container_name: zt-pdp
+    working_dir: /app/pdp
+    command: ["opa", "run", "--server", "--config-file", "/app/pdp/opa_config.yaml", "/app/pdp/policies/", "--addr", ":8181"]
+    ports:
+      - "127.0.0.1:8181:8181"
+    networks:
+      net_pdp: {}
+    healthcheck:
+      test: ["CMD", "opa", "check", "/app/pdp/policies/authz.rego"]
+
+  # ------------------------------------------------------------ Ressource --
+  ressource:
+    <<: *zt
+    container_name: zt-ressource
+    working_dir: /app/ressource
+    command: ["python3", "app.py"]
+    environment:
+      PKI_DIR: /pki-pqc
+      ZT_WSGI_BACKEND: keepalive
+      ZT_DEBUG_CONNS: "1"
+    volumes:
+      - ./pki-pqc:/pki-pqc:ro
+    ports:
+      - "127.0.0.1:8446:8446"
+    networks:
+      net_s2s:
+        aliases: ["ressource.ztpqc.lab"]
+    healthcheck:
+      test: ["CMD", "python3", "-c",
+             "import urllib.request as u, ssl; u.urlopen('https://127.0.0.1:8446/health', context=ssl._create_unverified_context(), timeout=5)"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+networks:
+  # PEP <-> IdP : JWKS / generation de token
+  net_idp: {}
+  # PEP <-> PDP (OPA) : decision d'autorisation (http, sans TLS)
+  net_pdp: {}
+  # PEP <-> Ressource : relais mTLS service-a-service
+  net_s2s: {}
