@@ -21,6 +21,9 @@ import requests
 from flask import Flask, Response, jsonify, request
 from werkzeug.serving import WSGIRequestHandler, run_simple
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from common import tlsopt  # noqa: F401  (chaine sans racine si ZT_SEND_ROOT=0)
+
 import config
 import jwks_client
 import jwt_signer
@@ -35,6 +38,9 @@ _resource_session = requests.Session()
 
 app = Flask(__name__)
 
+# v2 : vérificateur OCSP, créé au démarrage après l'inscription auprès de la PKI.
+_ocsp = None
+
 
 class PeerCertRequestHandler(WSGIRequestHandler):
     """Expose le certificat client (s'il existe) dans l'environnement WSGI."""
@@ -45,8 +51,10 @@ class PeerCertRequestHandler(WSGIRequestHandler):
         if peer_cert:
             subject = dict(x[0] for x in peer_cert.get("subject", []))
             environ["SSL_CLIENT_CN"] = subject.get("commonName")
+            environ["SSL_CLIENT_CERT_DER"] = self.connection.getpeercert(binary_form=True)
         else:
             environ["SSL_CLIENT_CN"] = None
+            environ["SSL_CLIENT_CERT_DER"] = None
         return environ
 
 
@@ -68,6 +76,15 @@ def authenticate_request() -> dict:
 
     # --- Cas 1 : mTLS (service-to-service) ----------------------------------
     if peer_cn:
+        # v2 : la chaîne a été vérifiée pendant le handshake ; on vérifie en
+        # plus le statut de révocation (OCSP, avec cache borné). Toute
+        # incertitude entraîne le refus (fail-closed).
+        if _ocsp is not None:
+            from common.ocsp_client import RevocationError
+            try:
+                _ocsp.check(request.environ.get("SSL_CLIENT_CERT_DER"))
+            except RevocationError as exc:
+                raise AuthenticationError(f"Statut de révocation refusé : {exc}") from exc
         logger.info("Authentification mTLS réussie (CN=%s)", peer_cn)
         return {"auth_method": "mtls", "service_id": peer_cn}
 
@@ -106,7 +123,7 @@ def authenticate_request() -> dict:
             raise AuthenticationError(f"Incohérence d'algorithme entre le token ({alg!r}) et le JWKS ({jwks_alg!r})")
 
         try:
-            claims = jwt_signer.verify_jwt(token, public_key, alg)
+            claims = jwt_signer.verify_jwt(token, public_key, alg, audience=config.EXPECTED_AUDIENCE)
         except ValueError as exc:
             raise AuthenticationError(f"Signature invalide ou token expiré: {exc}") from exc
 
@@ -120,6 +137,15 @@ def authenticate_request() -> dict:
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "service": "pep"})
+
+
+@app.route("/_zt/metrics", methods=["GET"])
+def zt_metrics():
+    """Compteurs internes de mesure (OCSP) -- prototype uniquement."""
+    if not config.METRICS_ENABLED:
+        return jsonify({"error": "disabled"}), 404
+    return jsonify({"ocsp": dict(_ocsp.stats) if _ocsp else None,
+                    "upstream_reuse": config.UPSTREAM_REUSE})
 
 
 @app.route("/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
@@ -144,7 +170,10 @@ def proxy(subpath):
 
     # --- Étape 3 : flux d'accès, relayé en mTLS vers la Ressource --------------
     target_url = config.RESOURCE_BASE_URL.rstrip("/") + "/" + subpath
-    forwarded_headers = {k: v for k, v in request.headers if k.lower() not in ("host", "content-length")}
+    forwarded_headers = {k: v for k, v in request.headers
+                         if k.lower() not in ("host", "content-length", "connection")}
+    if not config.UPSTREAM_REUSE:
+        forwarded_headers["Connection"] = "close"
 
     try:
         upstream = _resource_session.request(
@@ -168,6 +197,12 @@ def proxy(subpath):
 
 
 if __name__ == "__main__":
+    if os.environ.get("PKI_URL"):
+        # v2 : certificat obtenu auprès du service PKI, puis vérificateur OCSP.
+        from common import enroll
+        from common.ocsp_client import OCSPChecker
+        config.PEP_TLS_CERT, config.PEP_TLS_KEY = enroll.enroll("pep")
+        _ocsp = OCSPChecker(config.CA_CERT)
     for path, label in [
         (config.PEP_TLS_CERT, "certificat TLS du PEP"),
         (config.PEP_TLS_KEY, "clé privée TLS du PEP"),
@@ -181,7 +216,6 @@ if __name__ == "__main__":
     ssl_context = mtls_handler.build_server_ssl_context()
 
     logger.info("Démarrage du PEP sur https://%s:%s", config.HOST, config.PORT)
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from common import keepalive_server
     if keepalive_server.use_keepalive_backend():
         keepalive_server.serve(

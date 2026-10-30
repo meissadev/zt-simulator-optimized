@@ -1,0 +1,180 @@
+# Simulateur PQC-Zero Trust -- version 2 (PKI separee, OCSP, PDP en mTLS).
+#
+# Differences avec docker-compose.yml (version optimisee) :
+#   * un conteneur `pki` porte la CA, l'inscription des composants et le
+#     repondeur OCSP. Les autres conteneurs ne recoivent plus le dossier PKI
+#     (cles privees comprises) : chacun genere sa cle, obtient son certificat
+#     par CSR et ne partage que l'ancre de confiance (volume `trust`, en
+#     lecture seule) ;
+#   * le PEP verifie la revocation des certificats clients par OCSP ;
+#   * le lien PEP -> PDP passe par une passerelle mTLS post-quantique ;
+#     OPA n'ecoute plus qu'en local dans son conteneur ;
+#   * mode classique ou post-quantique choisi par fichier d'environnement
+#     (env/pqc.env, env/classical.env), avec le meme code ;
+#   * micro-segmentation conservee : un reseau par lien.
+#
+# Lancement : docker compose -f docker-compose.v2.yml --env-file env/pqc.env up -d
+
+name: zt-pqc-v2
+
+x-zt: &zt
+  image: ztpqc-services:v2
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+  restart: "no"
+  tmpfs:
+    - /run/zt
+  environment: &zt-env
+    OPENSSL_CONF: ${OPENSSL_CNF}
+    PKI_URL: https://pki.ztpqc.lab:8447
+    PKI_KEY_ALG: ${PKI_KEY_ALG}
+    CA_CERT: /trust/ca.cert.pem
+    ZT_WSGI_BACKEND: keepalive
+    ZT_MAX_CONN_LIFETIME: ${ZT_MAX_CONN_LIFETIME:-900}
+    ZT_SEND_ROOT: ${ZT_SEND_ROOT:-1}
+    ZT_TCP_NODELAY: ${ZT_TCP_NODELAY:-1}
+    ZT_DEBUG_CONNS: ${ZT_DEBUG_CONNS:-0}
+
+services:
+  # ------------------------------------------------------------ PKI -------
+  pki:
+    <<: *zt
+    container_name: zt2-pki
+    working_dir: /app/pkisvc
+    command: ["python3", "app.py"]
+    environment:
+      <<: *zt-env
+      ENROLL_TOKENS: idp:${TOK_IDP},pep:${TOK_PEP},ressource:${TOK_RES},pdp:${TOK_PDP},batch-service:${TOK_BENCH},revoked-service:${TOK_BENCH}
+      PKI_ADMIN_TOKEN: ${PKI_ADMIN_TOKEN}
+      CERT_DAYS: ${CERT_DAYS:-2}
+      OCSP_NEXT_UPDATE_MIN: ${OCSP_NEXT_UPDATE_MIN:-5}
+    volumes:
+      - trust:/trust
+    ports:
+      - "${PUBLISH_ADDR:-127.0.0.1}:18447:8447"
+    networks:
+      net_pki_idp: {aliases: ["pki.ztpqc.lab"]}
+      net_pki_pep: {aliases: ["pki.ztpqc.lab"]}
+      net_pki_pdp: {aliases: ["pki.ztpqc.lab"]}
+      net_pki_res: {aliases: ["pki.ztpqc.lab"]}
+    healthcheck: &hc
+      test: ["CMD", "python3", "-c",
+             "import urllib.request as u, ssl; u.urlopen('https://127.0.0.1:8447/health', context=ssl._create_unverified_context(), timeout=5)"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  # ------------------------------------------------------------ IdP -------
+  idp:
+    <<: *zt
+    container_name: zt2-idp
+    working_dir: /app/idp
+    command: ["python3", "app.py"]
+    environment:
+      <<: *zt-env
+      ENROLL_TOKEN: ${TOK_IDP}
+      CRYPTO_MODE: ${CRYPTO_MODE}
+      PQC_SIG_ALG: cross-rsdp-128-balanced
+    volumes:
+      - trust:/trust:ro
+    ports:
+      - "${PUBLISH_ADDR:-127.0.0.1}:18444:8444"
+    networks:
+      net_idp: {aliases: ["idp.ztpqc.lab"]}
+      net_pki_idp: {}
+    depends_on:
+      pki: {condition: service_healthy}
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "python3", "-c",
+             "import urllib.request as u, ssl; u.urlopen('https://127.0.0.1:8444/health', context=ssl._create_unverified_context(), timeout=5)"]
+
+  # ------------------------------------------- PDP (OPA + passerelle) -----
+  pdp:
+    <<: *zt
+    container_name: zt2-pdp
+    working_dir: /app/pdp
+    command: ["sh", "-c", "opa run --server --addr 127.0.0.1:8181 --config-file /app/pdp/opa_config.yaml /app/pdp/policies/ & exec python3 /app/common/tls_gateway.py"]
+    environment:
+      <<: *zt-env
+      ENROLL_TOKEN: ${TOK_PDP}
+      GATEWAY_ALLOWED_CN: pep
+    volumes:
+      - trust:/trust:ro
+    networks:
+      net_pdp: {aliases: ["pdp.ztpqc.lab"]}
+      net_pki_pdp: {}
+    depends_on:
+      pki: {condition: service_healthy}
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "python3", "-c", "import socket; socket.create_connection(('127.0.0.1', 8182), 2); socket.create_connection(('127.0.0.1', 8181), 2)"]
+
+  # ------------------------------------------------------- Ressource ------
+  ressource:
+    <<: *zt
+    container_name: zt2-ressource
+    working_dir: /app/ressource
+    command: ["python3", "app.py"]
+    environment:
+      <<: *zt-env
+      ENROLL_TOKEN: ${TOK_RES}
+    volumes:
+      - trust:/trust:ro
+    networks:
+      net_s2s: {aliases: ["ressource.ztpqc.lab"]}
+      net_pki_res: {}
+    depends_on:
+      pki: {condition: service_healthy}
+    healthcheck:
+      <<: *hc
+      # mTLS exige un certificat client : on teste seulement l'ecoute TCP.
+      test: ["CMD", "python3", "-c", "import socket; socket.create_connection(('127.0.0.1', 8446), 2)"]
+
+  # ------------------------------------------------------------ PEP -------
+  pep:
+    <<: *zt
+    container_name: zt2-pep
+    working_dir: /app/pep
+    command: ["python3", "app.py"]
+    environment:
+      <<: *zt-env
+      ENROLL_TOKEN: ${TOK_PEP}
+      EXPECTED_JWT_ALG: ${EXPECTED_JWT_ALG}
+      IDP_JWKS_URL: https://idp.ztpqc.lab:8444/jwks
+      RESOURCE_BASE_URL: https://ressource.ztpqc.lab:8446
+      OPA_URL: https://pdp.ztpqc.lab:8182/v1/data/authz/allow
+      OCSP_URL: https://pki.ztpqc.lab:8447/ocsp
+      OCSP_ENABLED: ${OCSP_ENABLED:-1}
+      OCSP_CACHE_TTL: ${OCSP_CACHE_TTL:-60}
+      ZT_UPSTREAM_REUSE: ${ZT_UPSTREAM_REUSE:-1}
+    volumes:
+      - trust:/trust:ro
+    ports:
+      - "${PUBLISH_ADDR:-127.0.0.1}:18443:8443"
+    networks:
+      net_idp: {}
+      net_pdp: {}
+      net_s2s: {}
+      net_pki_pep: {}
+    depends_on:
+      idp: {condition: service_healthy}
+      pdp: {condition: service_healthy}
+      ressource: {condition: service_healthy}
+    healthcheck:
+      <<: *hc
+      test: ["CMD", "python3", "-c",
+             "import urllib.request as u, ssl; u.urlopen('https://127.0.0.1:8443/health', context=ssl._create_unverified_context(), timeout=5)"]
+
+volumes:
+  trust: {}
+
+networks:
+  net_idp: {}       # PEP <-> IdP (JWKS)
+  net_pdp: {}       # PEP <-> PDP (decision, mTLS post-quantique)
+  net_s2s: {}       # PEP <-> Ressource (mTLS)
+  net_pki_idp: {}   # IdP -> PKI (inscription)
+  net_pki_pep: {}   # PEP -> PKI (inscription, OCSP)
+  net_pki_pdp: {}   # PDP -> PKI (inscription)
+  net_pki_res: {}   # Ressource -> PKI (inscription)

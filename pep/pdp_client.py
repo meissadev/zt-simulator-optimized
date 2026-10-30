@@ -43,7 +43,14 @@ def evaluate(subject: dict, resource_path: str, method: str) -> bool:
         }
     }
     try:
-        response = _pdp_session.post(config.OPA_URL, json=payload, timeout=config.OPA_TIMEOUT_SECONDS)
+        # v2 : lien PEP -> PDP en TLS 1.3 post-quantique, authentifié par le
+        # certificat du PEP (passerelle mTLS devant OPA).
+        tls = {}
+        if config.OPA_URL.startswith("https://"):
+            tls = {"cert": (config.PEP_TLS_CERT, config.PEP_TLS_KEY), "verify": config.CA_CERT}
+        headers = {} if config.UPSTREAM_REUSE else {"Connection": "close"}
+        response = _pdp_session.post(config.OPA_URL, json=payload, headers=headers,
+                                     timeout=config.OPA_TIMEOUT_SECONDS, **tls)
         response.raise_for_status()
     except requests.RequestException as exc:
         raise PDPError(f"Échec d'appel au PDP : {exc}") from exc

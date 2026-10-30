@@ -165,7 +165,7 @@ def decode_unverified(token: str) -> DecodedToken:
     )
 
 
-def verify_jwt(token: str, public_key: bytes, alg: str) -> dict:
+def verify_jwt(token: str, public_key: bytes, alg: str, audience: str = None) -> dict:
     """
     Vérifie la signature et les claims temporelles (exp/nbf) d'un JWS.
     Retourne le payload si valide, lève ValueError sinon.
@@ -188,8 +188,11 @@ def verify_jwt(token: str, public_key: bytes, alg: str) -> dict:
     payload = json.loads(b64url_decode(payload_b64))
 
     now = int(time.time())
-    if "exp" in payload and now >= payload["exp"]:
-        raise ValueError("Token expiré")
+    # v2 : "exp" est obligatoire (un jeton sans expiration est refusé).
+    if "exp" not in payload or now >= payload["exp"]:
+        raise ValueError("Token expiré ou sans expiration")
+    if audience is not None and payload.get("aud") != audience:
+        raise ValueError(f"Destinataire inattendu : {payload.get('aud')!r}")
     if "nbf" in payload and now < payload["nbf"]:
         raise ValueError("Token pas encore valide (nbf)")
 

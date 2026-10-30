@@ -23,7 +23,8 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages \
         'Werkzeug==3.1.8' \
         'cryptography==50.0.1' \
         'requests==2.32.3' \
-        'liboqs-python==0.16.0'
+        'liboqs-python==0.16.0' \
+        'asn1crypto==1.5.1'
 
 # HQC-1 pour le module ssl de Python : ajouter ssl_conf/Groups = hqc1 au
 # openssl.cnf de l'image (oqsprovider y est deja active).
@@ -43,6 +44,9 @@ if "[tls_system_default]" not in s:
         "[tls_system_default]\nGroups = hqc1\n"
     )
 io.open(path, "w", encoding="utf-8").write(s)
+# v2 : variante classique (X25519 / P-256), selectionnee par OPENSSL_CONF.
+io.open("/opt/openssl-3.5.8/openssl-classical.cnf", "w", encoding="utf-8").write(
+    s.replace("Groups = hqc1", "Groups = x25519:P-256"))
 print("openssl.cnf: ssl_module/hqc1 OK")
 PY
 
@@ -52,6 +56,8 @@ COPY idp/      /app/idp/
 COPY pep/      /app/pep/
 COPY ressource/ /app/ressource/
 COPY pdp/      /app/pdp/
+COPY pkisvc/   /app/pkisvc/
+COPY metrics/bench_v2.py metrics/aggregate_v2.py /app/metrics/
 
 # Binaire OPA 1.20.2 (fourni avec le projet, cf. .gitignore) pour le
 # conteneur PDP.

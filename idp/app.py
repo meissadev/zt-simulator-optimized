@@ -91,6 +91,7 @@ def authenticate():
     now = int(time.time())
     claims = {
         "iss": config.ISSUER,
+        "aud": config.AUDIENCE,
         "sub": username,
         "iat": now,
         "nbf": now,
@@ -146,6 +147,11 @@ def build_ssl_context() -> ssl.SSLContext:
 
 
 if __name__ == "__main__":
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    if os.environ.get("PKI_URL"):
+        # v2 : certificat TLS obtenu auprès du service PKI (inscription).
+        from common import enroll
+        config.IDP_TLS_CERT, config.IDP_TLS_KEY = enroll.enroll("idp")
     for path, label in [
         (config.IDP_TLS_CERT, "certificat TLS de l'IdP"),
         (config.IDP_TLS_KEY, "clé privée TLS de l'IdP"),

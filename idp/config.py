@@ -25,6 +25,8 @@ PORT = int(os.environ.get("IDP_PORT", "8444"))
 ISSUER = os.environ.get("JWT_ISSUER", "https://idp.ztpqc.lab")
 SIGNING_KID = os.environ.get("JWT_KID", "idp-key-1")
 TOKEN_TTL_SECONDS = int(os.environ.get("JWT_TTL", "300"))
+# v2 : destinataire du jeton (le PEP), vérifié par celui-ci.
+AUDIENCE = os.environ.get("JWT_AUDIENCE", "https://pep.ztpqc.lab")
 
 # --- Sélection du backend cryptographique -----------------------------------
 # "classical" : RSA-3072 (baseline pour le comparatif)

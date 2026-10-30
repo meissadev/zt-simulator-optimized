@@ -105,6 +105,11 @@ def build_ssl_context() -> ssl.SSLContext:
 
 
 if __name__ == "__main__":
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    if os.environ.get("PKI_URL"):
+        # v2 : certificat obtenu auprès du service PKI (inscription).
+        from common import enroll
+        CERT_FILE, KEY_FILE = enroll.enroll("ressource")
     for path, label in [
         (CERT_FILE, "certificat de la ressource"),
         (KEY_FILE, "clé privée de la ressource"),

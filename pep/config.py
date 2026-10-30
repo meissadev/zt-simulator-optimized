@@ -41,9 +41,18 @@ TRUSTED_ISSUERS = list(ISSUER_JWKS_ENDPOINTS.keys())
 EXPECTED_JWT_ALG = os.environ.get("EXPECTED_JWT_ALG", "RSA3072-PSS-SHA384")
 
 # --- PDP (OPA) ---------------------------------------------------------------
-OPA_URL = os.environ.get("OPA_URL", "http://localhost:8181/v1/data/authz/allow")
+OPA_URL = os.environ.get("OPA_URL", "https://pdp.ztpqc.lab:8182/v1/data/authz/allow")
 OPA_TIMEOUT_SECONDS = float(os.environ.get("OPA_TIMEOUT_SECONDS", "2.0"))
 
 # --- Ressource (backend protégé, appelé en mTLS par le PEP) -----------------
 RESOURCE_BASE_URL = os.environ.get("RESOURCE_BASE_URL", "https://ressource.ztpqc.lab:8446")
 RESOURCE_TIMEOUT_SECONDS = float(os.environ.get("RESOURCE_TIMEOUT_SECONDS", "5.0"))
+
+# --- v2 -----------------------------------------------------------------------
+# Destinataire attendu des jetons (claim "aud").
+EXPECTED_AUDIENCE = os.environ.get("EXPECTED_AUDIENCE", "https://pep.ztpqc.lab")
+# 1 : connexions réutilisées vers le PDP et la Ressource (keep-alive) ;
+# 0 : nouvelle connexion TLS à chaque requête (scénario « pire cas »).
+UPSTREAM_REUSE = os.environ.get("ZT_UPSTREAM_REUSE", "1") == "1"
+# Point de mesure interne (compteurs OCSP), désactivable.
+METRICS_ENABLED = os.environ.get("ZT_METRICS", "1") == "1"

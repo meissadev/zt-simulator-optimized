@@ -39,6 +39,13 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
+import time
+
+# v2 : duree de vie maximale d'une connexion TLS reutilisee (secondes).
+TCP_NODELAY = os.environ.get("ZT_TCP_NODELAY", "1") == "1"
+MAX_CONN_LIFETIME = float(os.environ.get("ZT_MAX_CONN_LIFETIME", "900"))
+
+
 def use_keepalive_backend():
     """True si ZT_WSGI_BACKEND=keepalive (sinon défaut : Werkzeug)."""
     return os.environ.get("ZT_WSGI_BACKEND", "").strip().lower() == "keepalive"
@@ -98,9 +105,31 @@ class KeepAliveRequestHandler(BaseHTTPRequestHandler):
     timeout = 30
     close_connection = False
 
+    # --- handshake TLS dans le thread de la connexion (v2) -------------------
+    # Le handshake n'est plus fait dans la boucle d'acceptation : un handshake
+    # post-quantique lent ne bloque plus les autres clients.
+
+    def setup(self):
+        self._born = time.monotonic()
+        self._hs_ok = True
+        try:
+            self.request.do_handshake()
+        except (ssl.SSLError, OSError, socket.timeout) as exc:
+            self._hs_ok = False
+            if self.server.conn_log:
+                print("[zt-keepalive] handshake TLS refuse : %s" % exc,
+                      file=sys.stderr, flush=True)
+        super().setup()
+
+    def _lifetime_exceeded(self):
+        return (time.monotonic() - self._born) > MAX_CONN_LIFETIME
+
     # --- boucle keep-alive --------------------------------------------------
 
     def handle(self):
+        if not self._hs_ok:
+            self.close_connection = True
+            return
         try:
             while not self.close_connection:
                 try:
@@ -182,6 +211,10 @@ class KeepAliveRequestHandler(BaseHTTPRequestHandler):
                     if k == "commonName":
                         cn = v
         env["SSL_CLIENT_CN"] = cn
+        # v2 : certificat client complet (DER), pour la verification OCSP.
+        env["SSL_CLIENT_CERT_DER"] = (
+            self.connection.getpeercert(binary_form=True) if cn else None
+        )
         return env
 
     def _run_wsgi(self, head_only=False):
@@ -254,10 +287,18 @@ class KeepAliveRequestHandler(BaseHTTPRequestHandler):
                 headers.append(("Content-Length", str(len(body))))
             headers.sort(key=lambda kv: kv[0].lower() != "content-length")
 
+            # v2 : la connexion est fermee si le client le demande
+            # (Connection: close) ou si sa duree de vie maximale est atteinte
+            # (SP 800-207A : connexion bornee a 15-30 min ou a la duree du
+            # certificat).
+            if self._lifetime_exceeded():
+                self.close_connection = True
             self.send_response_only(code, status_line.split(" ", 1)[1] if " " in status_line else None)
             for key, value in headers:
+                if key.lower() == "connection":
+                    continue
                 self.send_header(key, value)
-            self.send_header("Connection", "keep-alive")
+            self.send_header("Connection", "close" if self.close_connection else "keep-alive")
             self.end_headers()
 
             if not head_only and body:
@@ -321,7 +362,13 @@ class KeepAliveHTTPServer(ThreadingHTTPServer):
         sock, addr = super().get_request()
         try:
             sock.settimeout(15)
-            conn = self.ssl_context.wrap_socket(sock, server_side=True)
+            # Sans TCP_NODELAY, l'en-tete et le corps de la reponse partent en
+            # deux segments : Nagle retient le second jusqu'a l'ACK du premier,
+            # que le client differe (~40 ms sous Linux).
+            if TCP_NODELAY:
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            conn = self.ssl_context.wrap_socket(
+                sock, server_side=True, do_handshake_on_connect=False)
         except ssl.SSLError:
             try:
                 sock.close()
@@ -341,6 +388,8 @@ class KeepAliveHTTPServer(ThreadingHTTPServer):
 def serve(app, host, port, ssl_context, server_name=None,
           conn_log=False):
     """Lance le backend keep-alive en boucle (bloquant, comme run_simple)."""
+    from common import tlsopt
+    tlsopt.apply(ssl_context)
     httpd = KeepAliveHTTPServer(
         (host, port), app, ssl_context,
         server_name=server_name, conn_log=conn_log,

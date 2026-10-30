@@ -4,7 +4,10 @@ __pycache__/
 *.pyc
 pki/
 pki-pqc/
-metrics/
+metrics/*
+!metrics/bench_v2.py
+!metrics/aggregate_v2.py
+results/
 logs/
 *.log
 .git/
