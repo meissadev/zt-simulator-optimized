@@ -25,7 +25,7 @@ import time
 import requests
 from asn1crypto import ocsp
 
-from common import x509util
+from common import httpclient, x509util
 
 OCSP_URL = os.environ.get("OCSP_URL", "https://pki.ztpqc.lab:8447/ocsp")
 OCSP_ENABLED = os.environ.get("OCSP_ENABLED", "1") == "1"
@@ -43,10 +43,7 @@ class OCSPChecker:
         self.ca = x509util.load_cert_file(ca_cert_path)
         self.ca_name_hash = hashlib.sha1(x509util.subject_der(self.ca)).digest()
         self.ca_key_hash = x509util.key_hash_sha1(self.ca)
-        self.session = requests.Session()
-        self.session.verify = verify or ca_cert_path
-        if client_cert:
-            self.session.cert = client_cert
+        self.session = httpclient.session(verify or ca_cert_path, client_cert)
         self._cache = {}            # serial -> (status, expires_at)
         self._lock = threading.Lock()
         self._trusted_responders = {}   # empreinte DER -> True

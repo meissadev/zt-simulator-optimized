@@ -22,7 +22,7 @@ from flask import Flask, Response, jsonify, request
 from werkzeug.serving import WSGIRequestHandler, run_simple
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from common import tlsopt  # noqa: F401  (chaine sans racine si ZT_SEND_ROOT=0)
+from common import httpclient, tlsopt  # noqa: F401
 
 import config
 import jwks_client
@@ -33,8 +33,16 @@ import pdp_client
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [pep] %(message)s")
 logger = logging.getLogger(__name__)
 
-# Session réutilisée globale pour les appels à la Ressource (HTTP client)
-_resource_session = requests.Session()
+# Session vers la Ressource, creee au premier appel (apres l'inscription) avec
+# un contexte TLS partage (common/httpclient.py).
+_resource_session = None
+
+
+def resource_session():
+    global _resource_session
+    if _resource_session is None:
+        _resource_session = httpclient.session(config.CA_CERT, mtls_handler.resource_client_cert())
+    return _resource_session
 
 app = Flask(__name__)
 
@@ -176,13 +184,11 @@ def proxy(subpath):
         forwarded_headers["Connection"] = "close"
 
     try:
-        upstream = _resource_session.request(
+        upstream = resource_session().request(
             method=request.method,
             url=target_url,
             headers=forwarded_headers,
             data=request.get_data(),
-            cert=mtls_handler.resource_client_cert(),
-            verify=config.CA_CERT,
             timeout=config.RESOURCE_TIMEOUT_SECONDS,
         )
     except requests.RequestException as exc:

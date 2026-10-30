@@ -33,7 +33,7 @@ sys.path.insert(0, "/app")
 
 import requests
 
-from common import enroll, tlsopt, x509util
+from common import enroll, httpclient, tlsopt, x509util
 
 
 def stats(xs):
@@ -72,11 +72,9 @@ class Bench:
 
     # ------------------------------------------------------------ outils --
     def session(self, cert=None):
-        s = requests.Session()
-        s.verify = self.ca
-        if cert:
-            s.cert = cert
-        return s
+        # Contexte TLS partage (un client reel ne le recree pas a chaque
+        # connexion) ; chaque nouvelle session ouvre une nouvelle connexion.
+        return httpclient.session(self.ca, cert)
 
     def timed(self, fn, n, reuse, cert=None):
         """Execute fn(session) n fois ; renvoie les durees en ms."""

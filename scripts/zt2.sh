@@ -27,7 +27,8 @@ tokens)
 up)
     mode=$2; shift 2
     "${COMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
-    env "$@" "${COMPOSE[@]}" --env-file env/$mode.env --env-file env/tokens.env up -d --wait >/dev/null
+    extra=(); [[ -f env/host.env ]] && extra=(--env-file env/host.env)   # ex. PUBLISH_ADDR=0.0.0.0
+    env "$@" "${COMPOSE[@]}" --env-file env/$mode.env --env-file env/tokens.env "${extra[@]}" up -d --wait >/dev/null 2>&1
     echo "architecture $mode demarree ($*)" ;;
 down)
     "${COMPOSE[@]}" down -v --remove-orphans ;;

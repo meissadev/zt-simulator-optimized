@@ -61,9 +61,13 @@ services:
     healthcheck: &hc
       test: ["CMD", "python3", "-c",
              "import urllib.request as u, ssl; u.urlopen('https://127.0.0.1:8447/health', context=ssl._create_unverified_context(), timeout=5)"]
-      interval: 3s
+      # Verification frequente au demarrage seulement : chaque test lance un
+      # interpreteur Python, ce qui perturberait les mesures s'il etait repete.
+      start_period: 300s
+      start_interval: 2s
+      interval: 600s
       timeout: 5s
-      retries: 40
+      retries: 3
 
   # ------------------------------------------------------------ IdP -------
   idp:

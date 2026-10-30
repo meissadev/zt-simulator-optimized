@@ -14,12 +14,22 @@ import config
 
 logger = logging.getLogger(__name__)
 
-# Session réutilisée globale pour les appels au PDP
-_pdp_session = requests.Session()
+from common import httpclient
 
-# Configure TCP_NODELAY pour éviter les délais de Nagle
-_pdp_session.mount('http://', requests.adapters.HTTPAdapter())
-_pdp_session.mount('https://', requests.adapters.HTTPAdapter())
+# Session vers le PDP, creee au premier appel (apres l'inscription du PEP).
+_pdp_session = None
+
+
+def _session():
+    global _pdp_session
+    if _pdp_session is None:
+        if config.OPA_URL.startswith("https://"):
+            # v2 : lien PEP -> PDP en TLS 1.3 post-quantique, authentifie par
+            # le certificat du PEP (passerelle mTLS devant OPA).
+            _pdp_session = httpclient.session(config.CA_CERT, (config.PEP_TLS_CERT, config.PEP_TLS_KEY))
+        else:
+            _pdp_session = requests.Session()
+    return _pdp_session
 
 
 class PDPError(Exception):
@@ -43,14 +53,9 @@ def evaluate(subject: dict, resource_path: str, method: str) -> bool:
         }
     }
     try:
-        # v2 : lien PEP -> PDP en TLS 1.3 post-quantique, authentifié par le
-        # certificat du PEP (passerelle mTLS devant OPA).
-        tls = {}
-        if config.OPA_URL.startswith("https://"):
-            tls = {"cert": (config.PEP_TLS_CERT, config.PEP_TLS_KEY), "verify": config.CA_CERT}
         headers = {} if config.UPSTREAM_REUSE else {"Connection": "close"}
-        response = _pdp_session.post(config.OPA_URL, json=payload, headers=headers,
-                                     timeout=config.OPA_TIMEOUT_SECONDS, **tls)
+        response = _session().post(config.OPA_URL, json=payload, headers=headers,
+                                   timeout=config.OPA_TIMEOUT_SECONDS)
         response.raise_for_status()
     except requests.RequestException as exc:
         raise PDPError(f"Échec d'appel au PDP : {exc}") from exc
