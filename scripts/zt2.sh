@@ -20,8 +20,9 @@ alg() { [[ $1 == pqc ]] && echo CROSSrsdp128balanced || echo rsa:3072; }
 
 case "${1:-}" in
 build)
-    # Image de base (OpenSSL 3.5.8, liboqs 0.16.0, oqs-provider 36cafae) puis image
-    # des services. Comptez 20 a 30 minutes sur 2 vCPU.
+    # Image de base (OpenSSL 3.5.8, liboqs be7ecb9, oqs-provider 36cafae) puis image
+    # des services. Comptez 20 a 30 minutes sur 2 vCPU. BuildKit requis (ADD --checksum).
+    docker buildx version >/dev/null 2>&1 || { echo "installez docker-buildx (deploy/bootstrap_host.sh)"; exit 1; }
     docker build -f docker/Dockerfile.base -t pqc:latest .
     docker build -f docker/Dockerfile -t $IMG . ;;
 report)

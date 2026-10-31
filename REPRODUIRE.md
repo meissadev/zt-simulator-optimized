@@ -12,7 +12,7 @@ fichier `env/<mode>.env` change.
 |---|---|
 | Ubuntu (images) | 24.04, Python 3.12.3 |
 | OpenSSL | 3.5.8 |
-| liboqs | 0.16.0 (tag) |
+| liboqs | 0.16.0, commit be7ecb9 de main (18/09/2026) |
 | oqs-provider | 36cafae (0.12.0-dev) |
 | liboqs-python | 0.16.0 |
 | Flask / Werkzeug / requests / urllib3 | 3.1.3 / 3.1.8 / 2.32.3 / 2.8.0 |
