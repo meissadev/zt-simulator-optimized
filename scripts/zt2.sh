@@ -1,7 +1,8 @@
 #!/bin/bash
 # zt2.sh -- pilotage du simulateur v2 (serveur et client de mesure).
 #
-#   scripts/zt2.sh build                       construit les images (versions figees)
+#   scripts/zt2.sh pull                        recupere l'image des mesures (Docker Hub, ~1 min)
+#   scripts/zt2.sh build                       ou la reconstruit (versions figees, 20 a 30 min)
 #   scripts/zt2.sh tokens                      genere env/tokens.env (une fois par hote)
 #   scripts/zt2.sh up <mode> [VAR=val ...]     demarre l'architecture (mode : pqc|classical)
 #   scripts/zt2.sh down                        arrete et efface (CA comprise)
@@ -13,12 +14,18 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 COMPOSE=(docker compose -f docker-compose.v2.yml)
 IMG=ztpqc-services:v2
+# Image publiee : celle qui a servi aux mesures du memoire (digest 110ed54ef576).
+HUB_IMG=${ZT_HUB_IMAGE:-meissadev/pqc-zt:services-v2}
 mkdir -p results
 
 cnf() { [[ $1 == pqc ]] && echo /opt/openssl-3.5.8/openssl.cnf || echo /opt/openssl-3.5.8/openssl-classical.cnf; }
 alg() { [[ $1 == pqc ]] && echo CROSSrsdp128balanced || echo rsa:3072; }
 
 case "${1:-}" in
+pull)
+    docker pull "$HUB_IMG"
+    docker tag "$HUB_IMG" $IMG
+    docker image inspect -f 'image prete : {{.Id}}' $IMG ;;
 build)
     # Image de base (OpenSSL 3.5.8, liboqs be7ecb9, oqs-provider 36cafae) puis image
     # des services. Comptez 20 a 30 minutes sur 2 vCPU. BuildKit requis (ADD --checksum).

@@ -44,7 +44,13 @@ ship() {  # ship <hote> : code (arbre de travail) + image
     log "code -> $h"
     tar czf - --exclude=results --exclude=.git --exclude='env/tokens.env' --exclude='env/host.env' \
         --exclude=deploy/aws/.terraform . | r "$h" "mkdir -p $DIR && tar xzf - -C $DIR && mkdir -p $DIR/results"
-    if [[ ${BUILD_REMOTE:-0} == 1 ]]; then
+    # IMAGE_SOURCE : pull (Docker Hub, defaut), ship (image locale envoyee), build
+    local src=${IMAGE_SOURCE:-pull}
+    [[ ${BUILD_REMOTE:-0} == 1 ]] && src=build
+    if [[ $src == pull ]]; then
+        log "image depuis Docker Hub sur $h"
+        r "$h" "cd $DIR && scripts/zt2.sh pull"
+    elif [[ $src == build ]]; then
         log "construction de l'image sur $h (20 a 30 min)"
         r "$h" "cd $DIR && scripts/zt2.sh build"
     else

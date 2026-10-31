@@ -6,6 +6,19 @@ Toutes les mesures du memoire proviennent de `docker-compose.v2.yml` (architectu
 (X25519 + RSA-3072) et post-quantique (HQC-1 + CROSS-RSDP-128-balanced) ; seul le
 fichier `env/<mode>.env` change.
 
+## Images
+
+L'image exacte des mesures est publiee sur Docker Hub (depot public) :
+
+| Tag | Contenu | Digest |
+|---|---|---|
+| `meissadev/pqc-zt:services-v2` | services (IdP, PEP, PDP, PKI, ressource, banc) | `sha256:110ed54ef576...` |
+| `meissadev/pqc-zt:base` | Ubuntu 24.04, OpenSSL 3.5.8, liboqs, oqs-provider | `sha256:e53d477a3ddd...` |
+
+`scripts/zt2.sh pull` la recupere et la renomme `ztpqc-services:v2` (nom attendu
+par `docker-compose.v2.yml`). `scripts/zt2.sh build` reconstruit les memes
+versions depuis les sources (`docker/Dockerfile.base`, `docker/Dockerfile`).
+
 ## Versions figees
 
 | Composant | Version |
@@ -22,7 +35,8 @@ fichier `env/<mode>.env` change.
 
 ```bash
 sudo bash deploy/bootstrap_host.sh      # Docker + Compose (une fois)
-scripts/zt2.sh build                    # images, 20 a 30 min sur 2 vCPU
+scripts/zt2.sh pull                     # image des mesures depuis Docker Hub (~1 min)
+# ou : scripts/zt2.sh build             # reconstruction complete, 20 a 30 min sur 2 vCPU
 scripts/zt2.sh tokens                   # jetons d'inscription (env/tokens.env)
 scripts/zt2.sh matrix vm 100            # 12 configurations, environ 25 min
 scripts/zt2.sh report                   # results/summary.csv + tableau
