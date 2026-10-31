@@ -1,12 +1,14 @@
 #!/bin/bash
 # zt2.sh -- pilotage du simulateur v2 (serveur et client de mesure).
 #
+#   scripts/zt2.sh build                       construit les images (versions figees)
 #   scripts/zt2.sh tokens                      genere env/tokens.env (une fois par hote)
 #   scripts/zt2.sh up <mode> [VAR=val ...]     demarre l'architecture (mode : pqc|classical)
 #   scripts/zt2.sh down                        arrete et efface (CA comprise)
 #   scripts/zt2.sh ca [fichier]                ancre de confiance (fichier ou stdout)
 #   scripts/zt2.sh bench <mode> <cible_ip> <ca> <label> <reuse> [options bench_v2]
 #   scripts/zt2.sh matrix <env_label> [N]      matrice complete (SERVER_SSH/SERVER_IP : serveur distant)
+#   scripts/zt2.sh report                      agrege results/ (results/summary.csv)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 COMPOSE=(docker compose -f docker-compose.v2.yml)
@@ -17,6 +19,13 @@ cnf() { [[ $1 == pqc ]] && echo /opt/openssl-3.5.8/openssl.cnf || echo /opt/open
 alg() { [[ $1 == pqc ]] && echo CROSSrsdp128balanced || echo rsa:3072; }
 
 case "${1:-}" in
+build)
+    # Image de base (OpenSSL 3.5.8, liboqs 0.16.0, oqs-provider 36cafae) puis image
+    # des services. Comptez 20 a 30 minutes sur 2 vCPU.
+    docker build -f docker/Dockerfile.base -t pqc:latest .
+    docker build -f docker/Dockerfile -t $IMG . ;;
+report)
+    python3 metrics/aggregate_v2.py results/ --csv results/summary.csv ;;
 tokens)
     {
         for v in TOK_IDP TOK_PEP TOK_RES TOK_PDP TOK_BENCH PKI_ADMIN_TOKEN; do
@@ -57,6 +66,7 @@ matrix)
     srv() { if [[ -n ${SERVER_SSH:-} ]]; then $SERVER_SSH "cd ~/zt-simulator-v2 && scripts/zt2.sh $*"; else "$0" "$@"; fi; }
     cfg() {  # cfg <mode> <reuse> <etiquette> "<variables serveur>" [options bench]
         local mode=$1 reuse=$2 tag=$3 vars=$4; shift 4
+        [[ " ${VARIANTS:-reuse1 reuse0 root ttl0 noocsp nagle} " == *" $tag "* ]] || return 0
         srv up "$mode" ZT_UPSTREAM_REUSE="$reuse" $vars
         srv ca > "results/ca-$env-$mode.pem"
         local sr=0; [[ $vars == *ZT_SEND_ROOT=1* ]] && sr=1

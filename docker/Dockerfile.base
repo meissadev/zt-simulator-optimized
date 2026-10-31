@@ -1,0 +1,123 @@
+# Image de base : Ubuntu 24.04 + Python 3.12.3 + OpenSSL 3.5.8 + liboqs + oqs-provider
+#
+# Versions figees pour la reproductibilite des mesures du memoire :
+#   liboqs 0.16.0 (tag), oqs-provider 36cafae (0.12.0-dev).
+# Construction : scripts/zt2.sh build   (ou docker build -f docker/Dockerfile.base -t pqc:latest .)
+
+FROM ubuntu:24.04
+
+ARG LIBOQS_REF=0.16.0
+ARG OQSPROVIDER_REF=36cafae
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ------------------------------------------------------------------
+# 1. Dépendances système + Python 3.12.3 (version native de Ubuntu 24.04)
+# ------------------------------------------------------------------
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        checkinstall \
+        zlib1g-dev \
+        libffi-dev \
+        wget \
+        perl \
+        git \
+        ca-certificates \
+        cmake \
+        ninja-build \
+        python3 \
+        python3-dev \
+        python3-pip \
+        python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Vérification de la version exacte de Python
+RUN python3 --version && python3 --version | grep -q "3.12.3"
+
+# ------------------------------------------------------------------
+# 2. Compilation et installation d'OpenSSL 3.5.8 (isolé dans /opt)
+#    (installation_openssl.sh avec URL corrigée)
+# ------------------------------------------------------------------
+RUN set -eux; \
+    cd /tmp \
+    && wget -q https://github.com/openssl/openssl/releases/download/openssl-3.5.8/openssl-3.5.8.tar.gz \
+    && tar -xf openssl-3.5.8.tar.gz \
+    && cd openssl-3.5.8 \
+    && ./config --prefix=/opt/openssl-3.5.8 --openssldir=/opt/openssl-3.5.8 shared zlib \
+    && make -j"$(nproc)" \
+    && make install \
+    && echo "/opt/openssl-3.5.8/lib64" > /etc/ld.so.conf.d/openssl-3.5.8.conf \
+    && ldconfig \
+    && rm -rf /tmp/openssl-3.5.8.tar.gz /tmp/openssl-3.5.8
+
+# ------------------------------------------------------------------
+# 3. Configuration OpenSSL : activation du provider OQS par défaut
+# ------------------------------------------------------------------
+RUN printf '%s\n' \
+        'openssl_conf = openssl_init' \
+        '' \
+        '[openssl_init]' \
+        'providers = provider_sect' \
+        '' \
+        '[provider_sect]' \
+        'default = default_sect' \
+        'oqsprovider = oqsprovider_sect' \
+        '' \
+        '[default_sect]' \
+        'activate = 1' \
+        '' \
+        '[oqsprovider_sect]' \
+        'module = oqsprovider.so' \
+        'activate = 1' \
+        '' \
+        > /opt/openssl-3.5.8/openssl.cnf
+
+# ------------------------------------------------------------------
+# 4. Compilation et installation de liboqs puis oqs-provider
+#    (installation_oqs.sh avec URLs corrigées)
+# ------------------------------------------------------------------
+RUN set -eux; \
+    cd /tmp \
+    && git clone --depth 1 --branch "${LIBOQS_REF}" https://github.com/open-quantum-safe/liboqs.git \
+    && cd liboqs \
+    && mkdir build && cd build \
+    && cmake \
+        -DCMAKE_INSTALL_PREFIX=/opt/liboqs \
+        -DBUILD_SHARED_LIBS=ON \
+        -DOQS_USE_OPENSSL=ON \
+        -DOPENSSL_ROOT_DIR=/opt/openssl-3.5.8 \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DOQS_BUILD_ONLY_LIB=ON \
+        -DOQS_DIST_BUILD=ON \
+        -DOQS_ENABLE_KEM_ML_KEM=ON \
+        .. \
+    && make -j"$(nproc)" \
+    && make install \
+    && cd /tmp \
+    && git clone https://github.com/open-quantum-safe/oqs-provider.git \
+    && cd oqs-provider \
+    && git checkout "${OQSPROVIDER_REF}" \
+    && cmake \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/opt/openssl-3.5.8 \
+        -DOPENSSL_ROOT_DIR=/opt/openssl-3.5.8 \
+        -Dliboqs_DIR=/opt/liboqs \
+        -S . \
+        -B build \
+    && cmake --build build --parallel "$(nproc)" \
+    && cmake --install build \
+    && echo "/opt/liboqs/lib" > /etc/ld.so.conf.d/liboqs.conf \
+    && ldconfig \
+    && rm -rf /tmp/liboqs /tmp/oqs-provider
+
+# ------------------------------------------------------------------
+# 5. Environnement d'exécution
+# ------------------------------------------------------------------
+ENV PATH=/opt/openssl-3.5.8/bin:$PATH \
+    LD_LIBRARY_PATH=/opt/openssl-3.5.8/lib64:/opt/openssl-3.5.8/lib:/opt/liboqs/lib \
+    OPENSSL_CONF=/opt/openssl-3.5.8/openssl.cnf \
+    OPENSSL_MODULES=/opt/openssl-3.5.8/lib64/ossl-modules
+
+WORKDIR /app
+CMD ["/bin/bash"]

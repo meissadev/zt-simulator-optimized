@@ -12,9 +12,10 @@
 #     (ssl_conf -> Groups = hqc1), miroir du /usr/local/ssl/openssl.cnf de
 #     l'hote, necessaire pour que le module ssl de Python negocie HQC-1 ;
 #   * copier le code des services (idp, pep, ressource, common), la politique
-#     OPA et le binaire opa (1.20.2) fourni par l'hote.
+#     OPA et le binaire opa (1.20.2, telecharge et verifie).
 
-FROM pqc:latest
+ARG BASE_IMAGE=pqc:latest
+FROM ${BASE_IMAGE}
 
 # Dependances Python (pins = idp/pep/ressource/requirements.txt de l'hote).
 # PEP 668 : --break-system-packages requis sur Ubuntu 24.04 (image mono-usage).
@@ -61,7 +62,7 @@ COPY metrics/bench_v2.py metrics/aggregate_v2.py /app/metrics/
 
 # Binaire OPA 1.20.2 (fourni avec le projet, cf. .gitignore) pour le
 # conteneur PDP.
-COPY opa /usr/local/bin/opa
-RUN chmod 755 /usr/local/bin/opa
+# OPA 1.20.2 (binaire officiel, somme de controle verifiee).
+ADD --chmod=755 --checksum=sha256:69da5179ee403d10fa11bab6cfb4ffb0d23dba5f9b682fa977db772a1da5670f     https://github.com/open-policy-agent/opa/releases/download/v1.20.2/opa_linux_amd64_static /usr/local/bin/opa
 
 WORKDIR /app

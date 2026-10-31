@@ -1,0 +1,134 @@
+{
+ "label": "vm-pqc-root",
+ "reuse": 1,
+ "n": 100,
+ "send_root": true,
+ "started": 1793404171.181988,
+ "host": {
+  "node": "ca",
+  "cpus": 2,
+  "cpu": "Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz",
+  "mem_kb": 3960856
+ },
+ "enroll_ms": 325.7,
+ "sizes": {
+  "ca_cert_der": 13563,
+  "client_cert_der": 13676,
+  "pep_cert_der": 13655,
+  "tls_version": "TLSv1.3",
+  "cipher": "TLS_AES_256_GCM_SHA384",
+  "jwt": 17846,
+  "jwks": 187,
+  "ocsp_response": 26951,
+  "ocsp_client_fetch_ms": 267.07
+ },
+ "handshake_server_auth": {
+  "tcp_connect_ms": {
+   "n": 100,
+   "mean": 1.254,
+   "median": 1.062,
+   "stdev": 0.958,
+   "p05": 0.404,
+   "p95": 3.15,
+   "min": 0.301,
+   "max": 6.413
+  },
+  "tls_ms": {
+   "n": 100,
+   "mean": 90.396,
+   "median": 82.216,
+   "stdev": 35.196,
+   "p05": 49.627,
+   "p95": 142.186,
+   "min": 46.338,
+   "max": 255.05
+  },
+  "bytes_client_to_server": {
+   "n": 100,
+   "mean": 2732,
+   "median": 2732.0,
+   "stdev": 0.0,
+   "p05": 2732,
+   "p95": 2732,
+   "min": 2732,
+   "max": 2732
+  },
+  "bytes_server_to_client": {
+   "n": 100,
+   "mean": 45282,
+   "median": 45282.0,
+   "stdev": 0.0,
+   "p05": 45282,
+   "p95": 45282,
+   "min": 45282,
+   "max": 45282
+  },
+  "tls_over_rtt": 77.41
+ },
+ "handshake_mtls": {
+  "tcp_connect_ms": {
+   "n": 100,
+   "mean": 1.093,
+   "median": 0.829,
+   "stdev": 0.847,
+   "p05": 0.337,
+   "p95": 2.651,
+   "min": 0.289,
+   "max": 4.911
+  },
+  "tls_ms": {
+   "n": 100,
+   "mean": 97.869,
+   "median": 88.533,
+   "stdev": 38.266,
+   "p05": 57.896,
+   "p95": 164.997,
+   "min": 54.615,
+   "max": 234.871
+  },
+  "bytes_client_to_server": {
+   "n": 100,
+   "mean": 40784,
+   "median": 40784.0,
+   "stdev": 0.0,
+   "p05": 40784,
+   "p95": 40784,
+   "min": 40784,
+   "max": 40784
+  },
+  "bytes_server_to_client": {
+   "n": 100,
+   "mean": 45282,
+   "median": 45282.0,
+   "stdev": 0.0,
+   "p05": 45282,
+   "p95": 45282,
+   "min": 45282,
+   "max": 45282
+  },
+  "tls_over_rtt": 106.74
+ },
+ "pep_metrics_before": {
+  "ocsp": {
+   "bytes_total": 0,
+   "cache_hits": 0,
+   "checks": 0,
+   "fetch_ms_total": 0.0,
+   "fetches": 0,
+   "last_size": 0
+  },
+  "upstream_reuse": true
+ },
+ "pep_metrics_after": {
+  "ocsp": {
+   "bytes_total": 0,
+   "cache_hits": 0,
+   "checks": 0,
+   "fetch_ms_total": 0.0,
+   "fetches": 0,
+   "last_size": 0
+  },
+  "upstream_reuse": true
+ },
+ "finished": 1793404191.610523
+}

@@ -1,0 +1,134 @@
+{
+ "label": "vmaws-pqc-root",
+ "reuse": 1,
+ "n": 100,
+ "send_root": true,
+ "started": 1793407061.3378742,
+ "host": {
+  "node": "ca",
+  "cpus": 2,
+  "cpu": "Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz",
+  "mem_kb": 3960856
+ },
+ "enroll_ms": 1477.5,
+ "sizes": {
+  "ca_cert_der": 13563,
+  "client_cert_der": 13675,
+  "pep_cert_der": 13656,
+  "tls_version": "TLSv1.3",
+  "cipher": "TLS_AES_256_GCM_SHA384",
+  "jwt": 17846,
+  "jwks": 187,
+  "ocsp_response": 26951,
+  "ocsp_client_fetch_ms": 642.19
+ },
+ "handshake_server_auth": {
+  "tcp_connect_ms": {
+   "n": 100,
+   "mean": 74.067,
+   "median": 73.443,
+   "stdev": 2.823,
+   "p05": 71.677,
+   "p95": 78.441,
+   "min": 70.301,
+   "max": 86.807
+  },
+  "tls_ms": {
+   "n": 100,
+   "mean": 319.19,
+   "median": 312.941,
+   "stdev": 39.271,
+   "p05": 302.999,
+   "p95": 330.241,
+   "min": 298.416,
+   "max": 662.384
+  },
+  "bytes_client_to_server": {
+   "n": 100,
+   "mean": 2732,
+   "median": 2732.0,
+   "stdev": 0.0,
+   "p05": 2732,
+   "p95": 2732,
+   "min": 2732,
+   "max": 2732
+  },
+  "bytes_server_to_client": {
+   "n": 100,
+   "mean": 45283,
+   "median": 45283.0,
+   "stdev": 0.0,
+   "p05": 45283,
+   "p95": 45283,
+   "min": 45283,
+   "max": 45283
+  },
+  "tls_over_rtt": 4.26
+ },
+ "handshake_mtls": {
+  "tcp_connect_ms": {
+   "n": 100,
+   "mean": 75.927,
+   "median": 74.19,
+   "stdev": 14.744,
+   "p05": 72.023,
+   "p95": 78.43,
+   "min": 70.015,
+   "max": 219.923
+  },
+  "tls_ms": {
+   "n": 100,
+   "mean": 338.351,
+   "median": 328.685,
+   "stdev": 46.712,
+   "p05": 320.279,
+   "p95": 366.848,
+   "min": 306.638,
+   "max": 693.713
+  },
+  "bytes_client_to_server": {
+   "n": 100,
+   "mean": 40361,
+   "median": 40361.0,
+   "stdev": 0.0,
+   "p05": 40361,
+   "p95": 40361,
+   "min": 40361,
+   "max": 40361
+  },
+  "bytes_server_to_client": {
+   "n": 100,
+   "mean": 45283,
+   "median": 45283.0,
+   "stdev": 0.0,
+   "p05": 45283,
+   "p95": 45283,
+   "min": 45283,
+   "max": 45283
+  },
+  "tls_over_rtt": 4.43
+ },
+ "pep_metrics_before": {
+  "ocsp": {
+   "bytes_total": 0,
+   "cache_hits": 0,
+   "checks": 0,
+   "fetch_ms_total": 0.0,
+   "fetches": 0,
+   "last_size": 0
+  },
+  "upstream_reuse": true
+ },
+ "pep_metrics_after": {
+  "ocsp": {
+   "bytes_total": 0,
+   "cache_hits": 0,
+   "checks": 0,
+   "fetch_ms_total": 0.0,
+   "fetches": 0,
+   "last_size": 0
+  },
+  "upstream_reuse": true
+ },
+ "finished": 1793407147.419086
+}

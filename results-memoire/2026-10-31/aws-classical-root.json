@@ -1,0 +1,134 @@
+{
+ "label": "aws-classical-root",
+ "reuse": 1,
+ "n": 100,
+ "send_root": true,
+ "started": 1793403518.5747957,
+ "host": {
+  "node": "ip-172-31-31-173",
+  "cpus": 2,
+  "cpu": "Intel(R) Xeon(R) Platinum 8488C",
+  "mem_kb": 3903712
+ },
+ "enroll_ms": 257.6,
+ "sizes": {
+  "ca_cert_der": 1114,
+  "client_cert_der": 1227,
+  "pep_cert_der": 1207,
+  "tls_version": "TLSv1.3",
+  "cipher": "TLS_AES_256_GCM_SHA384",
+  "jwt": 816,
+  "jwks": 642,
+  "ocsp_response": 1733,
+  "ocsp_client_fetch_ms": 31.7
+ },
+ "handshake_server_auth": {
+  "tcp_connect_ms": {
+   "n": 100,
+   "mean": 0.286,
+   "median": 0.329,
+   "stdev": 0.126,
+   "p05": 0.118,
+   "p95": 0.454,
+   "min": 0.098,
+   "max": 0.538
+  },
+  "tls_ms": {
+   "n": 100,
+   "mean": 2.383,
+   "median": 2.302,
+   "stdev": 0.23,
+   "p05": 2.183,
+   "p95": 2.699,
+   "min": 2.13,
+   "max": 3.745
+  },
+  "bytes_client_to_server": {
+   "n": 100,
+   "mean": 627,
+   "median": 627.0,
+   "stdev": 0.0,
+   "p05": 627,
+   "p95": 627,
+   "min": 627,
+   "max": 627
+  },
+  "bytes_server_to_client": {
+   "n": 100,
+   "mean": 3194,
+   "median": 3194.0,
+   "stdev": 0.0,
+   "p05": 3194,
+   "p95": 3194,
+   "min": 3194,
+   "max": 3194
+  },
+  "tls_over_rtt": 7.0
+ },
+ "handshake_mtls": {
+  "tcp_connect_ms": {
+   "n": 100,
+   "mean": 0.251,
+   "median": 0.159,
+   "stdev": 0.172,
+   "p05": 0.139,
+   "p95": 0.695,
+   "min": 0.135,
+   "max": 0.826
+  },
+  "tls_ms": {
+   "n": 100,
+   "mean": 3.933,
+   "median": 3.917,
+   "stdev": 0.246,
+   "p05": 3.574,
+   "p95": 4.427,
+   "min": 3.452,
+   "max": 4.815
+  },
+  "bytes_client_to_server": {
+   "n": 100,
+   "mean": 3108,
+   "median": 3108.0,
+   "stdev": 0.0,
+   "p05": 3108,
+   "p95": 3108,
+   "min": 3108,
+   "max": 3108
+  },
+  "bytes_server_to_client": {
+   "n": 100,
+   "mean": 3194,
+   "median": 3194.0,
+   "stdev": 0.0,
+   "p05": 3194,
+   "p95": 3194,
+   "min": 3194,
+   "max": 3194
+  },
+  "tls_over_rtt": 24.56
+ },
+ "pep_metrics_before": {
+  "ocsp": {
+   "bytes_total": 0,
+   "cache_hits": 0,
+   "checks": 0,
+   "fetch_ms_total": 0.0,
+   "fetches": 0,
+   "last_size": 0
+  },
+  "upstream_reuse": true
+ },
+ "pep_metrics_after": {
+  "ocsp": {
+   "bytes_total": 0,
+   "cache_hits": 0,
+   "checks": 0,
+   "fetch_ms_total": 0.0,
+   "fetches": 0,
+   "last_size": 0
+  },
+  "upstream_reuse": true
+ },
+ "finished": 1793403519.6772406
+}

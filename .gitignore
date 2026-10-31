@@ -26,3 +26,4 @@ metrics/**/*.txt
 # v2 : jetons d inscription et resultats de mesure
 env/tokens.env
 results/
+env/tokens*.env

@@ -1,0 +1,201 @@
+{
+ "label": "aws-classical-reuse0",
+ "reuse": 0,
+ "n": 100,
+ "send_root": false,
+ "started": 1793403441.6042938,
+ "host": {
+  "node": "ip-172-31-31-173",
+  "cpus": 2,
+  "cpu": "Intel(R) Xeon(R) Platinum 8488C",
+  "mem_kb": 3903712
+ },
+ "enroll_ms": 296.1,
+ "sizes": {
+  "ca_cert_der": 1114,
+  "client_cert_der": 1226,
+  "pep_cert_der": 1206,
+  "tls_version": "TLSv1.3",
+  "cipher": "TLS_AES_256_GCM_SHA384",
+  "jwt": 816,
+  "jwks": 642,
+  "ocsp_response": 1731,
+  "ocsp_client_fetch_ms": 31.7
+ },
+ "handshake_server_auth": {
+  "tcp_connect_ms": {
+   "n": 100,
+   "mean": 0.262,
+   "median": 0.168,
+   "stdev": 0.147,
+   "p05": 0.12,
+   "p95": 0.513,
+   "min": 0.096,
+   "max": 0.613
+  },
+  "tls_ms": {
+   "n": 100,
+   "mean": 2.368,
+   "median": 2.361,
+   "stdev": 0.272,
+   "p05": 2.082,
+   "p95": 2.661,
+   "min": 2.027,
+   "max": 4.072
+  },
+  "bytes_client_to_server": {
+   "n": 100,
+   "mean": 627,
+   "median": 627.0,
+   "stdev": 0.0,
+   "p05": 627,
+   "p95": 627,
+   "min": 627,
+   "max": 627
+  },
+  "bytes_server_to_client": {
+   "n": 100,
+   "mean": 2074,
+   "median": 2074.0,
+   "stdev": 0.0,
+   "p05": 2074,
+   "p95": 2074,
+   "min": 2074,
+   "max": 2074
+  },
+  "tls_over_rtt": 14.06
+ },
+ "handshake_mtls": {
+  "tcp_connect_ms": {
+   "n": 100,
+   "mean": 0.302,
+   "median": 0.198,
+   "stdev": 0.187,
+   "p05": 0.148,
+   "p95": 0.701,
+   "min": 0.139,
+   "max": 0.91
+  },
+  "tls_ms": {
+   "n": 100,
+   "mean": 3.736,
+   "median": 3.743,
+   "stdev": 0.267,
+   "p05": 3.291,
+   "p95": 4.116,
+   "min": 3.216,
+   "max": 4.757
+  },
+  "bytes_client_to_server": {
+   "n": 100,
+   "mean": 2229,
+   "median": 2229.0,
+   "stdev": 0.0,
+   "p05": 2229,
+   "p95": 2229,
+   "min": 2229,
+   "max": 2229
+  },
+  "bytes_server_to_client": {
+   "n": 100,
+   "mean": 2074,
+   "median": 2074.0,
+   "stdev": 0.0,
+   "p05": 2074,
+   "p95": 2074,
+   "min": 2074,
+   "max": 2074
+  },
+  "tls_over_rtt": 18.91
+ },
+ "user_token": {
+  "n": 100,
+  "mean": 5.923,
+  "median": 5.873,
+  "stdev": 0.184,
+  "p05": 5.738,
+  "p95": 6.391,
+  "min": 5.672,
+  "max": 6.588,
+  "errors": 0
+ },
+ "user_access": {
+  "n": 100,
+  "mean": 19.708,
+  "median": 19.051,
+  "stdev": 6.007,
+  "p05": 18.57,
+  "p95": 20.34,
+  "min": 18.342,
+  "max": 78.862,
+  "errors": 0
+ },
+ "s2s_access": {
+  "n": 100,
+  "mean": 20.713,
+  "median": 20.318,
+  "stdev": 1.971,
+  "p05": 19.96,
+  "p95": 21.808,
+  "min": 19.759,
+  "max": 38.962,
+  "errors": 0
+ },
+ "throughput_user": {
+  "concurrency": 4,
+  "seconds": 15.03,
+  "requests": 1075,
+  "errors": 0,
+  "req_per_s": 71.53,
+  "latency_ms": {
+   "n": 1075,
+   "mean": 55.769,
+   "median": 55.194,
+   "stdev": 7.685,
+   "p05": 43.407,
+   "p95": 68.894,
+   "min": 31.102,
+   "max": 82.798
+  }
+ },
+ "throughput_s2s": {
+  "concurrency": 4,
+  "seconds": 15.03,
+  "requests": 1006,
+  "errors": 0,
+  "req_per_s": 66.92,
+  "latency_ms": {
+   "n": 1006,
+   "mean": 59.651,
+   "median": 59.28,
+   "stdev": 8.256,
+   "p05": 46.983,
+   "p95": 74.129,
+   "min": 34.472,
+   "max": 92.162
+  }
+ },
+ "pep_metrics_before": {
+  "ocsp": {
+   "bytes_total": 0,
+   "cache_hits": 0,
+   "checks": 0,
+   "fetch_ms_total": 0.0,
+   "fetches": 0,
+   "last_size": 0
+  },
+  "upstream_reuse": false
+ },
+ "pep_metrics_after": {
+  "ocsp": {
+   "bytes_total": 1731,
+   "cache_hits": 1105,
+   "checks": 1106,
+   "fetch_ms_total": 15.408949000175198,
+   "fetches": 1,
+   "last_size": 1731
+  },
+  "upstream_reuse": false
+ },
+ "finished": 1793403477.4731402
+}
