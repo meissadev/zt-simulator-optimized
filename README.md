@@ -14,6 +14,10 @@ Le banc de mesure couvre deux scenarios :
 
 ## Architecture
 
+![Architecture PQC-ZT : plan de contrôle, plan de données et flux post-quantiques](docs/architecture-pqc-zt.png)
+
+*Architecture PQC-ZT (NIST SP 800-207) : tous les échanges passent par TLS 1.3 / mTLS post-quantique (HQC pour l'échange de clés, CROSS pour les signatures).*
+
 ```
                         Plan de controle
                   +--------------------------+
