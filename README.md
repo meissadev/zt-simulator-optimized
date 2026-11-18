@@ -63,6 +63,12 @@ oqs-provider 0.12, liboqs-python 0.16.0, OPA 1.20.2 (détail dans
 
 ## Démarrage rapide (un hôte Linux)
 
+Prérequis : Linux x86_64 (testé sur Ubuntu 24.04), 2 vCPU, 4 Go de RAM,
+environ 20 Go de disque, Docker avec Compose v2, `git`, `python3` et `openssl`,
+accès à Docker Hub. Sur Ubuntu, la première commande ci-dessous installe tout
+le nécessaire. Prérequis complets, y compris pour plusieurs hôtes et AWS :
+[REPRODUIRE.md](REPRODUIRE.md#prerequis).
+
 ```bash
 sudo bash deploy/bootstrap_host.sh   # Docker et Compose (une fois)
 scripts/zt2.sh pull                  # image des mesures depuis Docker Hub

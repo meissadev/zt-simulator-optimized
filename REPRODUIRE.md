@@ -6,6 +6,48 @@ Toutes les mesures du memoire proviennent de `docker-compose.v2.yml` (architectu
 (X25519 + RSA-3072) et post-quantique (HQC-1 + CROSS-RSDP-128-balanced) ; seul le
 fichier `env/<mode>.env` change.
 
+## Prerequis
+
+### Chaque hote qui execute l'architecture ou le banc
+
+| Element | Detail |
+|---|---|
+| Systeme | Linux x86_64 (amd64). Teste sur Ubuntu 24.04 ; `deploy/bootstrap_host.sh` prend aussi en charge Ubuntu 22.04 |
+| Ressources | 2 vCPU et 4 Go de RAM (configuration des mesures du memoire), environ 20 Go de disque |
+| Docker | Docker Engine, Docker Compose v2 et `docker-buildx` (ce dernier seulement pour `zt2.sh build`). L'utilisateur doit appartenir au groupe `docker` |
+| Outils | `bash`, `git`, `python3`, `openssl` (generation des jetons), `zstd` (seulement avec `IMAGE_SOURCE=ship`) |
+| Reseau | Acces a Docker Hub pour `zt2.sh pull` (ou a Internet pour `zt2.sh build`). Ports 18443, 18444 et 18447 libres |
+
+Sur Ubuntu, `sudo bash deploy/bootstrap_host.sh` installe Docker, Compose v2,
+buildx, zstd, git et python3, puis ajoute l'utilisateur au groupe `docker`
+(se reconnecter ensuite). Python et OpenSSL n'ont pas besoin de version
+particuliere sur l'hote : toute la cryptographie s'execute dans l'image.
+
+### En plus, pour une campagne sur plusieurs hotes (section 2)
+
+* Sur le poste qui pilote : `ssh`, `tar`, et une cle SSH **sans phrase de
+  passe** acceptee par le serveur et le client.
+* Le serveur doit accepter les connexions du client (et du poste, pour
+  `campaign.sh here`) sur les ports 18443, 18444 et 18447.
+* `campaign.sh here` execute le banc sur le poste lui-meme : il lui faut alors
+  aussi Docker et l'image (premier tableau).
+
+### En plus, pour le deploiement sur AWS (section 3)
+
+* Un compte AWS et un profil configure (`aws configure --profile <nom>`). Le
+  profil par defaut de `deploy/aws/variables.tf` est `claude-code` : passer
+  `-var aws_profile=<nom>` pour utiliser le sien.
+* Terraform 1.5 ou plus recent (fournisseur `hashicorp/aws` 5.x, telecharge par
+  `terraform init`), et `curl`.
+* Les types d'instances par defaut sont eligibles a l'offre gratuite, mais la
+  campagne peut entrainer des frais (trafic entre regions, depassement des
+  quotas) : detruire l'infrastructure apres les mesures.
+
+### Pour regenerer les figures
+
+`python3` avec `matplotlib` (`pip install matplotlib`). `aggregate_v2.py`
+n'utilise que la bibliotheque standard.
+
 ## Images
 
 L'image exacte des mesures est publiee sur Docker Hub (depot public) :
