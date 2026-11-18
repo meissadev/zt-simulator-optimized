@@ -34,9 +34,8 @@ particuliere sur l'hote : toute la cryptographie s'execute dans l'image.
 
 ### En plus, pour le deploiement sur AWS (section 3)
 
-* Un compte AWS et un profil configure (`aws configure --profile <nom>`). Le
-  profil par defaut de `deploy/aws/variables.tf` est `claude-code` : passer
-  `-var aws_profile=<nom>` pour utiliser le sien.
+* Un compte AWS et un profil configure (`aws configure`). Terraform utilise le
+  profil `default` ; pour un autre profil, passer `-var aws_profile=<nom>`.
 * Terraform 1.5 ou plus recent (fournisseur `hashicorp/aws` 5.x, telecharge par
   `terraform init`), et `curl`.
 * Les types d'instances par defaut sont eligibles a l'offre gratuite, mais la

@@ -7,7 +7,7 @@ variable "project" {
 variable "aws_profile" {
   description = "Profil AWS CLI utilise"
   type        = string
-  default     = "claude-code"
+  default     = "default"
 }
 
 variable "server_region" {
